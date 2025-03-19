@@ -22,15 +22,19 @@ on:
       backend_config:
         required: false
         type: string
-        description: "Terraform backend configuration file"
+        description: "Terraform backend configuration"
       action:
         required: true
         type: string
         description: "Action to perform: validate, plan, or apply"
     secrets:
-      TF_VAR_aws_access_key:
+      AWS_ACCESS_KEY_ID:
         required: true
-      TF_VAR_aws_secret_key:
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      TF_VAR_app_name:
+        required: true
+      TF_VAR_environment:
         required: true
       TF_VAR_aws_region:
         required: true
@@ -55,8 +59,8 @@ jobs:
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-access-key-id: ${{ secrets.TF_VAR_aws_access_key }}
-        aws-secret-access-key: ${{ secrets.TF_VAR_aws_secret_key }}
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.TF_VAR_aws_region }}
 
     - name: Terraform Format
