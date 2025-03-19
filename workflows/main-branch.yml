@@ -1,0 +1,21 @@
+name: Main Branch Workflow
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  terraform:
+    uses: ./.github/workflows/terraform.yml
+    with:
+      terraform_version: "1.5.0"
+      working_directory: "."
+      terraform_workspace: "default"
+      tf_vars_file: "terraform.tfvars"
+      backend_config: "backend.hcl"
+      action: "apply"
+    secrets:
+      TF_VAR_aws_access_key: ${{ secrets.TF_VAR_aws_access_key }}
+      TF_VAR_aws_secret_key: ${{ secrets.TF_VAR_aws_secret_key }}
+      TF_VAR_aws_region: ${{ secrets.TF_VAR_aws_region }} 

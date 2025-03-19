@@ -1,0 +1,89 @@
+name: Terraform Operations
+
+on:
+  workflow_call:
+    inputs:
+      terraform_version:
+        required: true
+        type: string
+        description: "Terraform version to use"
+      working_directory:
+        required: true
+        type: string
+        description: "Directory containing Terraform configuration"
+      terraform_workspace:
+        required: true
+        type: string
+        description: "Terraform workspace to use"
+      tf_vars_file:
+        required: false
+        type: string
+        description: "Terraform variables file to use"
+      backend_config:
+        required: false
+        type: string
+        description: "Terraform backend configuration file"
+      action:
+        required: true
+        type: string
+        description: "Action to perform: validate, plan, or apply"
+    secrets:
+      TF_VAR_aws_access_key:
+        required: true
+      TF_VAR_aws_secret_key:
+        required: true
+      TF_VAR_aws_region:
+        required: true
+
+jobs:
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ inputs.terraform_version }}
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.TF_VAR_aws_access_key }}
+        aws-secret-access-key: ${{ secrets.TF_VAR_aws_secret_key }}
+        aws-region: ${{ secrets.TF_VAR_aws_region }}
+
+    - name: Terraform Format
+      id: fmt
+      run: terraform fmt -check
+      continue-on-error: true
+
+    - name: Terraform Init
+      id: init
+      run: |
+        terraform init \
+          -backend-config="${{ inputs.backend_config }}" \
+          -reconfigure
+
+    - name: Terraform Validate
+      id: validate
+      run: terraform validate
+
+    - name: Terraform Plan
+      id: plan
+      if: ${{ inputs.action == 'plan' || inputs.action == 'apply' }}
+      run: |
+        terraform plan \
+          -var-file="${{ inputs.tf_vars_file }}" \
+          -out=tfplan
+      continue-on-error: true
+
+    - name: Terraform Apply
+      if: ${{ inputs.action == 'apply' }}
+      run: terraform apply -auto-approve tfplan 
