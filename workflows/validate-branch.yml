@@ -1,0 +1,29 @@
+name: Validate Branch Workflow
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  terraform:
+    uses: wcampos/terraformik/workflows/terraform.yml@main
+    environment: dev
+    with:
+      terraform_version: "1.5.0"
+      working_directory: "."
+      terraform_workspace: "dev"
+      tf_vars_file: "dev.tfvars"
+      backend_config: |
+        bucket = "${{ secrets.TF_BACKEND_BUCKET }}"
+        key = "${{ secrets.TF_BACKEND_KEY }}"
+        region = "${{ secrets.TF_BACKEND_REGION }}"
+        dynamodb_table = "${{ secrets.TF_BACKEND_DYNAMODB_TABLE }}"
+        encrypt = true
+      action: "plan"
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      TF_VAR_app_name: ${{ secrets.TF_VAR_app_name }}
+      TF_VAR_environment: ${{ secrets.TF_VAR_environment }}
+      TF_VAR_aws_region: ${{ secrets.TF_VAR_aws_region }} 
