@@ -4,95 +4,47 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - '**.md'
-      - '.github/workflows/release.yml'
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
-      pull-requests: write
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install build twine
-
-      - name: Get version from git tags
-        id: get_version
-        run: |
-          # Get the latest tag
-          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          
-          # Extract version numbers
-          major=$(echo $latest_tag | cut -d. -f1 | tr -d 'v')
-          minor=$(echo $latest_tag | cut -d. -f2)
-          patch=$(echo $latest_tag | cut -d. -f3)
-          
-          # Increment patch version
-          new_patch=$((patch + 1))
-          new_version="v$major.$minor.$new_patch"
-          
-          echo "new_version=$new_version" >> $GITHUB_OUTPUT
-
-      - name: Create and push tag
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git tag ${{ steps.get_version.outputs.new_version }}
-          git push origin ${{ steps.get_version.outputs.new_version }}
-
-      - name: Build package
-        run: |
-          python -m build
-
-      - name: Publish to PyPI
+      - name: Release
+        uses: release-drafter/release-drafter@v5
         env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          python -m twine upload dist/*
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.get_version.outputs.new_version }}
-          name: Release ${{ steps.get_version.outputs.new_version }}
-          body: |
-            ## Changes in this Release
-            
-            This release includes:
-            - Terraform backend configuration for AWS S3 and DynamoDB
-            - AWS CLI and Boto3 provisioners
-            - Environment-specific resource management
-            - App-specific resource naming
-            
-            ### Usage
-            
-            ```bash
-            # Using AWS CLI provisioner
-            ./provisioners/cli/provision.sh myapp dev
-            
-            # Using Boto3 provisioner
-            ./provisioners/boto3/provision.py --app-name myapp --environment dev
-            ```
-            
-            For more details, see the [documentation](provisioners/README.md).
-          draft: false
+          config-name: release-drafter.yml
+          publish: true
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          draft: false
+          name-template: 'v$RESOLVED_VERSION'
+          tag-template: 'v$RESOLVED_VERSION'
+          categories:
+            - title: '🚀 Features'
+              labels:
+                - 'feat'
+                - 'enhancement'
+            - title: '🐛 Bug Fixes'
+              labels:
+                - 'fix'
+                - 'bugfix'
+                - 'bug'
+            - title: '🧰 Maintenance'
+              labels:
+                - 'chore'
+                - 'documentation'
+                - 'ci'
+                - 'build'
+                - 'perf'
+                - 'refactor'
+                - 'style'
+                - 'test'
+            - title: '📦 Dependencies'
+              labels:
+                - 'dependencies'
+                - 'deps' 
