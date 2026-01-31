@@ -1,4 +1,7 @@
-name: Terraform Operations
+# Terraform Operations using GitHub OIDC (no static AWS keys).
+# Requires: IAM role with OIDC trust for your repo; job permissions id-token: write.
+# See README for OIDC setup.
+name: Terraform Operations (OIDC)
 
 on:
   workflow_call:
@@ -33,10 +36,9 @@ on:
         default: true
         description: "Post plan output as PR comment when action is plan (requires GITHUB_TOKEN)"
     secrets:
-      AWS_ACCESS_KEY_ID:
+      AWS_ROLE_ARN:
         required: true
-      AWS_SECRET_ACCESS_KEY:
-        required: true
+        description: "ARN of IAM role to assume via OIDC"
       TF_VAR_app_name:
         required: true
       TF_VAR_environment:
@@ -49,8 +51,11 @@ on:
 
 jobs:
   terraform:
-    name: Terraform
+    name: Terraform (OIDC)
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     defaults:
       run:
         working-directory: ${{ inputs.working_directory }}
@@ -65,11 +70,10 @@ jobs:
         terraform_version: ${{ inputs.terraform_version }}
         terraform_wrapper: false
 
-    - name: Configure AWS Credentials
+    - name: Configure AWS Credentials (OIDC)
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
         aws-region: ${{ secrets.TF_VAR_aws_region }}
 
     - name: Terraform Format
@@ -131,7 +135,7 @@ jobs:
           } catch (e) {
             planOutput = '(Plan output not found.)';
           }
-          const body = `#### Terraform Plan 📖
+          const body = `#### Terraform Plan 📖 (OIDC)
           <details><summary>Show Plan</summary>
 
           \`\`\`hcl
