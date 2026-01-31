@@ -15,6 +15,10 @@ A collection of reusable GitHub Actions workflows for Terraform operations with 
 - Early validation on branch pushes
 - Conventional commit validation
 - Automated semantic versioning and releases
+- **Terraform backend module** – bootstrap S3 + DynamoDB via Terraform (`modules/backend`)
+- **OIDC workflow** – use AWS OIDC instead of static keys (`workflows/terraform-oidc.yml`)
+- **Security scan** – tfsec in CI (optional, continue-on-error)
+- **Plan comment on PR** – post plan output as a PR comment (pass `GITHUB_TOKEN`)
 
 ## Quick Start
 
@@ -27,6 +31,8 @@ A collection of reusable GitHub Actions workflows for Terraform operations with 
    # Use the provisioners to create required AWS resources
    make provision-all APP_NAME=myapp ENVIRONMENT=dev
    ```
+
+   **Alternatively**, use the Terraform backend module to create S3 + DynamoDB via Terraform (see `modules/backend/README.md`).
 
 2. **Configure GitHub Environments**
    Create environments in your repository (e.g., `dev`, `staging`, `prod`) and add the following secrets:
@@ -61,9 +67,12 @@ A collection of reusable GitHub Actions workflows for Terraform operations with 
 
 ### 1. Reusable Terraform Workflow
 A reusable workflow that handles Terraform operations:
-- Initialization
+- Initialization (backend config written to `backend_config.hcl`)
 - Format checking
-- Plan generation
+- Validation
+- **tfsec** security scan (continue-on-error)
+- Plan generation (optional `tf_vars_file`)
+- **Plan comment on PR** when `action` is `plan` and `GITHUB_TOKEN` is passed
 - Apply execution
 - State management
 
@@ -96,9 +105,43 @@ jobs:
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      TF_VAR_app_name: ${{ secrets.TF_VAR_app_name }}
+      TF_VAR_environment: ${{ secrets.TF_VAR_environment }}
+      TF_VAR_aws_region: ${{ secrets.TF_VAR_aws_region }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-### 2. Feature Branch Workflow
+### 2. Terraform Operations (OIDC)
+Use **OIDC** instead of static AWS keys (recommended for security). Your repo must have an IAM role with OIDC trust for GitHub; the job needs `permissions: id-token: write`.
+
+```yaml
+jobs:
+  terraform:
+    uses: wcampos/terraformik/workflows/terraform-oidc.yml@main
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      terraform_version: '1.5.0'
+      working_directory: 'terraform'
+      terraform_workspace: 'dev'
+      tf_vars_file: 'dev.tfvars'
+      backend_config: |
+        bucket = "${{ secrets.TF_BACKEND_BUCKET }}"
+        key = "${{ secrets.TF_BACKEND_KEY }}"
+        region = "${{ secrets.TF_BACKEND_REGION }}"
+        dynamodb_table = "${{ secrets.TF_BACKEND_DYNAMODB_TABLE }}"
+        encrypt = true
+      action: 'plan'
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      TF_VAR_app_name: ${{ secrets.TF_VAR_app_name }}
+      TF_VAR_environment: ${{ secrets.TF_VAR_environment }}
+      TF_VAR_aws_region: ${{ secrets.TF_VAR_aws_region }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+### 3. Feature Branch Workflow
 Handles pull requests to feature branches:
 - Runs Terraform plan
 - Validates changes
@@ -131,9 +174,13 @@ jobs:
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      TF_VAR_app_name: ${{ secrets.TF_VAR_app_name }}
+      TF_VAR_environment: ${{ secrets.TF_VAR_environment }}
+      TF_VAR_aws_region: ${{ secrets.TF_VAR_aws_region }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-### 3. Main Branch Workflow
+### 4. Main Branch Workflow
 Manages merges to main branch:
 - Runs Terraform plan
 - Applies changes automatically
@@ -168,7 +215,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 ```
 
-### 4. Validate Branch Workflow
+### 5. Validate Branch Workflow
 Validates and plans on any branch push:
 - Runs format check
 - Validates configuration
@@ -205,7 +252,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 ```
 
-### 5. Conventional Commit Workflow
+### 6. Conventional Commit Workflow
 Validates commit messages against conventional commit format:
 - Enforces commit message format
 - Categorizes changes
@@ -246,7 +293,7 @@ jobs:
             revert
 ```
 
-### 6. Release Workflow
+### 7. Release Workflow
 Automatically creates releases based on conventional commits:
 - Generates semantic version numbers
 - Creates release notes
