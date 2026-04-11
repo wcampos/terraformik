@@ -9,7 +9,7 @@ description = "A collection of AWS provisioners for Terraform backend configurat
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
-    "boto3>=1.26.0",
+    "boto3>=1.42.88",
 ]
 license = {text = "MIT"}
 authors = [
